@@ -297,6 +297,14 @@
   tags:
     - keepalived-config
 
+- name: Make directory for keepalived's config
+  ansible.builtin.file:
+    path: "{{ keepalived_config_file_path | dirname }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - keepalived-config
+
 - name: Configure keepalived
   ansible.builtin.template:
     src: keepalived.conf.j2
@@ -314,6 +322,7 @@
     state: directory
     mode: "0755"
   when:
+    - ansible_service_mgr == 'systemd'
     - keepalived_systemd_overrides | bool
   tags:
     - keepalived-install
@@ -330,6 +339,7 @@
     - 'Wants'
     - 'After'
   when:
+    - ansible_service_mgr == 'systemd'
     - keepalived_systemd_overrides | bool
   notify:
     - Restart keepalived
@@ -344,6 +354,7 @@
     value: 'always'
     mode: '0644'
   when:
+    - ansible_service_mgr == 'systemd'
     - keepalived_systemd_overrides | bool
     - keepalived_systemd_override_service_restart | bool
   notify:
@@ -356,17 +367,18 @@
     path: /etc/systemd/system/keepalived.service.d/override.conf
     state: absent
   when:
+    - ansible_service_mgr == 'systemd'
     - not (keepalived_systemd_overrides | bool)
   tags:
     - keepalived-install
 
 - name: Ensuring keepalived is enabled and started
   ansible.builtin.service:
-    daemon_reload: true
+    daemon_reload: "{{ (ansible_service_mgr == 'systemd') | ternary(true, omit) }}"
     name: "{{ keepalived_service_name }}"
     state: "started"
     enabled: "yes"
-    masked: "no"
+    masked: "{{ (ansible_service_mgr == 'systemd') | ternary(false, omit) }}"
   register: _servicestart
   tags:
     - keepalived-install
